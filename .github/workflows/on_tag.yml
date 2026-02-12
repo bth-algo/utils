@@ -1,0 +1,24 @@
+name: Run on tag
+
+on:
+  workflow_call:
+    inputs:
+      course_id:
+        required: true
+        type: string
+      available_assignments:
+        required: true
+        type: string
+      student_id:
+        required: true
+        type: string
+      kmom_paths:
+        required: true
+        type: string
+
+jobs:
+  on-tag:
+    uses: bth-algo/utils/.github/workflows/tester.yml@main
+    with:
+      kmom_paths: ${{ inputs.kmom_paths }}
+    secrets: inherit
