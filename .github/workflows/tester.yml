@@ -6,6 +6,10 @@ on:
       kmom_paths:
         required: true
         type: string
+    outputs:
+      tests_passed:
+        description: "Whether all validation and tests passed"
+        value: ${{ jobs.check-results.outputs.tests_passed }}
 
 jobs:
   generate-matrix:
@@ -61,3 +65,21 @@ jobs:
         run: |
           echo "🔬 Running extras: ${{ matrix.folder }}. It is OK if these tests fail. It will not affect your grade"
           uv run tester -f -e ${{ matrix.folder }}
+
+  check-results:
+    needs: [run-kmoms]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      tests_passed: ${{ steps.set-output.outputs.tests_passed }}
+    steps:
+      - name: Check if tests passed
+        id: set-output
+        run: |
+          if [[ "${{ needs.run-kmoms.result }}" == "success" ]]; then
+            echo "tests_passed=true" >> $GITHUB_OUTPUT
+            echo "✅ All validation and tests passed"
+          else
+            echo "tests_passed=false" >> $GITHUB_OUTPUT
+            echo "❌ Validation or tests failed"
+          fi
