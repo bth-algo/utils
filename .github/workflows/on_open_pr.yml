@@ -43,8 +43,8 @@ jobs:
             const kmom = kmomMatch[1];
             console.log(`Extracted kmom: ${kmom}`);
             
-            // Extract kmom number (e.g., kmom03 -> 3, kmom10 -> 10)
-            const kmomNum = parseInt(kmom.replace('kmom', ''), 10);
+            // Extract kmom number (e.g., kmom03 -> 03, kmom10 -> 10)
+            const kmomNum = kmom.replace('kmom', '');
             const tagPrefix = `v${kmomNum}`;
             console.log(`Looking for tags starting with: ${tagPrefix}`);
             
