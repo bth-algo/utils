@@ -102,12 +102,33 @@ jobs:
             const latestTag = sortedTags[0];
             console.log(`Latest tag: ${latestTag.name} (SHA: ${latestTag.sha})`);
             
-            // Check workflow runs for this tag's SHA
+            // Dereference the tag to get the commit SHA
+            const tagObject = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `tags/${latestTag.name}`
+            });
+            
+            let commitSha = tagObject.data.object.sha;
+            
+            // If it's an annotated tag, we need to get the commit it points to
+            if (tagObject.data.object.type === 'tag') {
+              const annotatedTag = await github.rest.git.getTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_sha: commitSha
+              });
+              commitSha = annotatedTag.data.object.sha;
+            }
+            
+            console.log(`Commit SHA for tag: ${commitSha}`);
+            
+            // Check workflow runs for this commit SHA
             const workflowRuns = await github.rest.actions.listWorkflowRunsForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               event: 'push',
-              head_sha: latestTag.sha,
+              head_sha: commitSha,
               status: 'completed',
               per_page: 100
             });
