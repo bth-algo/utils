@@ -1,5 +1,8 @@
 name: Run tester when labeled
 
+# Kan lägga till workflow som kollar att sutdenter bara får sätta label för att köra testerna, och att de inte kan sätta label för att få PG eller ta bort PG. Det är ju bara lärarna som ska kunna sätta PG labeln, och det är ju inte meningen att studenterna ska kunna ta bort den heller
+
+
 on:
   workflow_call:
     inputs:
