@@ -55,55 +55,6 @@ jobs:
               return;
             }
             console.log(`Allowed tag prefixes for ${kmom}: ${allowedPrefixes.join(', ')}`);
-            
-            // Fetch tags for all allowed prefixes in parallel
-            const results = await Promise.all(
-              allowedPrefixes.map(prefix =>
-                github.rest.git.listMatchingRefs({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: `tags/${prefix}`
-                }).then(r => r.data).catch(() => [])
-              )
-            );
-            const tags = results.flat();
-            
-            if (tags.length === 0) {
-              console.log('No tags found');
-              core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `No tag found for ${kmom}. Push a tag with prefix from [${allowedPrefixes.join(', ')}] with passing tests first.`);
-              return;
-            }
-            
-            // Sort tags by semantic version (descending)
-            const sortedTags = tags
-              .map(tag => {
-                const tagName = tag.ref.replace('refs/tags/', '');
-                const versionMatch = tagName.match(/^v(\d+)\.(\d+)(?:\.(\d+))?$/);
-                if (!versionMatch) return null;
-                return {
-                  name: tagName,
-                  sha: tag.object.sha,
-                  major: parseInt(versionMatch[1], 10),
-                  minor: parseInt(versionMatch[2], 10),
-                  patch: versionMatch[3] ? parseInt(versionMatch[3], 10) : 0
-                };
-              })
-              .filter(t => t !== null)
-              .sort((a, b) => {
-                if (a.major !== b.major) return b.major - a.major;
-                if (a.minor !== b.minor) return b.minor - a.minor;
-                return b.patch - a.patch;
-              });
-            
-            if (sortedTags.length === 0) {
-              console.log('No valid semantic version tags found');
-              core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `No valid tag found for ${kmom}. Push a tag with prefix from [${allowedPrefixes.join(', ')}] with passing tests first.`);
-              return;
-            }
-            
-            console.log(`Checking ${sortedTags.length} tags for a passing workflow (latest semver first)...`);
 
             // Helper: resolve a tag ref to its commit SHA (handles annotated tags)
             async function resolveCommitSha(tagName) {
@@ -124,12 +75,45 @@ jobs:
               return sha;
             }
 
-            // Check each tag in semver-descending order; use the first with a passing workflow
-            let passingTag = null;
-            for (const tag of sortedTags) {
-              const commitSha = await resolveCommitSha(tag.name);
-              console.log(`Checking tag ${tag.name} (SHA: ${commitSha})...`);
+            // For each prefix (e.g. v01, v02, v03): find the latest tag and check it
+            // has a passing workflow. Every prefix must pass.
+            const prefixResults = [];
+            for (const prefix of allowedPrefixes) {
+              const response = await github.rest.git.listMatchingRefs({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${prefix}`
+              }).catch(() => ({ data: [] }));
 
+              const prefixTags = response.data
+                .map(tag => {
+                  const tagName = tag.ref.replace('refs/tags/', '');
+                  const m = tagName.match(/^v(\d+)\.(\d+)(?:\.(\d+))?$/);
+                  if (!m) return null;
+                  return {
+                    name: tagName,
+                    major: parseInt(m[1], 10),
+                    minor: parseInt(m[2], 10),
+                    patch: m[3] ? parseInt(m[3], 10) : 0
+                  };
+                })
+                .filter(t => t !== null)
+                .sort((a, b) => {
+                  if (a.major !== b.major) return b.major - a.major;
+                  if (a.minor !== b.minor) return b.minor - a.minor;
+                  return b.patch - a.patch;
+                });
+
+              if (prefixTags.length === 0) {
+                console.log(`❌ No tag found with prefix ${prefix}`);
+                prefixResults.push({ prefix, passed: false, message: `No tag found with prefix ${prefix}. Push a ${prefix}.x tag with passing tests.` });
+                continue;
+              }
+
+              const latestTag = prefixTags[0];
+              console.log(`Latest tag for ${prefix}: ${latestTag.name}`);
+
+              const commitSha = await resolveCommitSha(latestTag.name);
               const workflowRuns = await github.rest.actions.listWorkflowRunsForRepo({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -141,20 +125,22 @@ jobs:
 
               const successfulRun = workflowRuns.data.workflow_runs.find(run => run.conclusion === 'success');
               if (successfulRun) {
-                console.log(`✅ Tag ${tag.name} has a passing workflow: ${successfulRun.html_url}`);
-                passingTag = tag;
-                break;
+                console.log(`✅ ${latestTag.name} has a passing workflow: ${successfulRun.html_url}`);
+                prefixResults.push({ prefix, tag: latestTag.name, passed: true });
               } else {
-                console.log(`❌ Tag ${tag.name} has no passing workflow (${workflowRuns.data.workflow_runs.length} completed runs).`);
+                console.log(`❌ ${latestTag.name} has no passing workflow (${workflowRuns.data.workflow_runs.length} completed runs).`);
+                prefixResults.push({ prefix, tag: latestTag.name, passed: false, message: `Tag ${latestTag.name} has no passing workflow. Fix the errors and push a new ${prefix}.x tag with passing tests.` });
               }
             }
 
-            if (passingTag) {
+            const failed = prefixResults.filter(r => !r.passed);
+            if (failed.length === 0) {
               core.setOutput('workflow_passed', 'true');
               core.setOutput('error_message', '');
             } else {
+              const failMessages = failed.map(r => `- ${r.message}`).join('\n');
               core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `No tag for ${kmom} has a passing workflow. Fix the errors and push a new tag with prefix from [${allowedPrefixes.join(', ')}].`);
+              core.setOutput('error_message', `${kmom} requirements not met:\n${failMessages}`);
             }
 
   run-tester:
