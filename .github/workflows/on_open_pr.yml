@@ -15,6 +15,9 @@ on:
       kmom_paths:
         required: true
         type: string
+      tags:
+        required: true
+        type: string
 
 jobs:
   validate-tag:
@@ -43,31 +46,32 @@ jobs:
             const kmom = kmomMatch[1];
             console.log(`Extracted kmom: ${kmom}`);
             
-            // Extract kmom number (e.g., kmom03 -> 03, kmom10 -> 10)
-            const kmomNum = kmom.replace('kmom', '');
-            const tagPrefix = `v${kmomNum}`;
-            console.log(`Looking for tags starting with: ${tagPrefix}`);
-            
-            // Get all tags matching the prefix
-            let tags;
-            try {
-              const response = await github.rest.git.listMatchingRefs({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: `tags/${tagPrefix}`
-              });
-              tags = response.data;
-            } catch (error) {
-              console.log(`Error fetching tags: ${error.message}`);
+            // Look up allowed tag prefixes from TAGS config
+            const tagsConfig = JSON.parse('${{ inputs.tags }}');
+            const allowedPrefixes = tagsConfig[kmom];
+            if (!allowedPrefixes || allowedPrefixes.length === 0) {
               core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `No tag found for ${kmom}. Push ${tagPrefix}.0 with passing tests first.`);
+              core.setOutput('error_message', `No TAGS config found for ${kmom} — check org action variables.`);
               return;
             }
+            console.log(`Allowed tag prefixes for ${kmom}: ${allowedPrefixes.join(', ')}`);
+            
+            // Fetch tags for all allowed prefixes in parallel
+            const results = await Promise.all(
+              allowedPrefixes.map(prefix =>
+                github.rest.git.listMatchingRefs({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${prefix}`
+                }).then(r => r.data).catch(() => [])
+              )
+            );
+            const tags = results.flat();
             
             if (tags.length === 0) {
               console.log('No tags found');
               core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `No tag found for ${kmom}. Push ${tagPrefix}.0 with passing tests first.`);
+              core.setOutput('error_message', `No tag found for ${kmom}. Push a tag with prefix from [${allowedPrefixes.join(', ')}] with passing tests first.`);
               return;
             }
             
@@ -95,7 +99,7 @@ jobs:
             if (sortedTags.length === 0) {
               console.log('No valid semantic version tags found');
               core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `No valid tag found for ${kmom}. Push ${tagPrefix}.0 with passing tests first.`);
+              core.setOutput('error_message', `No valid tag found for ${kmom}. Push a tag with prefix from [${allowedPrefixes.join(', ')}] with passing tests first.`);
               return;
             }
             
@@ -120,7 +124,7 @@ jobs:
               });
               commitSha = annotatedTag.data.object.sha;
             }
-            
+
             console.log(`Commit SHA for tag: ${commitSha}`);
             
             // Check workflow runs for this commit SHA
@@ -137,7 +141,7 @@ jobs:
             
             if (workflowRuns.data.workflow_runs.length === 0) {
               core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `Tag ${latestTag.name} has no completed workflow runs. Wait for workflows to complete or push a new tag.`);
+              core.setOutput('error_message', `Tag ${latestTag.name} for ${kmom} has no completed workflow runs. Wait for workflows to complete or push a new tag with prefix from [${allowedPrefixes.join(', ')}].`);
               return;
             }
             
@@ -152,7 +156,7 @@ jobs:
               console.log(`❌ Tag ${latestTag.name} has no successful workflow runs`);
               const failedRun = workflowRuns.data.workflow_runs[0];
               core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `Tag ${latestTag.name} workflow failed. Fix the errors and push a new tag with passing tests.`);
+              core.setOutput('error_message', `Tag ${latestTag.name} for ${kmom} has no passing workflow. Fix the errors and push a new tag with prefix from [${allowedPrefixes.join(', ')}].`);
             }
 
   run-tester:
