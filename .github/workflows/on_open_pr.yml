@@ -204,6 +204,7 @@ jobs:
           student_id: ${{ inputs.student_id }}
           course_id: ${{inputs.course_id}}
           assignment_id: ${{ steps.resolve.outputs.assignment }}
+          grade: "PG"
           read_org_token: "${{ secrets.READ_ORG_TOKEN }}"
       
       - name: Put comment in PR about submission
