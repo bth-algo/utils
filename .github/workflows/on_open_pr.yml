@@ -25,6 +25,7 @@ jobs:
     outputs:
       workflow_passed: ${{ steps.check.outputs.workflow_passed }}
       error_message: ${{ steps.check.outputs.error_message }}
+      kmom: ${{ steps.check.outputs.kmom }}
     steps:
       - name: Check latest tag workflow status
         id: check
@@ -40,11 +41,13 @@ jobs:
             if (!kmomMatch) {
               core.setOutput('workflow_passed', 'false');
               core.setOutput('error_message', `Invalid branch format: ${baseRef}. Expected bth/submit/kmomXX`);
+              core.setFailed(`Invalid branch format: ${baseRef}. Expected bth/submit/kmomXX`);
               return;
             }
             
             const kmom = kmomMatch[1];
             console.log(`Extracted kmom: ${kmom}`);
+            core.setOutput('kmom', kmom);
             
             // Look up allowed tag prefixes from TAGS config
             const tagsConfig = JSON.parse('${{ inputs.tags }}');
@@ -52,6 +55,7 @@ jobs:
             if (!allowedPrefixes || allowedPrefixes.length === 0) {
               core.setOutput('workflow_passed', 'false');
               core.setOutput('error_message', `No TAGS config found for ${kmom} — check org action variables.`);
+              core.setFailed(`No TAGS config found for ${kmom} — check org action variables.`);
               return;
             }
             console.log(`Allowed tag prefixes for ${kmom}: ${allowedPrefixes.join(', ')}`);
@@ -141,6 +145,7 @@ jobs:
               const failMessages = failed.map(r => `- ${r.message}`).join('\n');
               core.setOutput('workflow_passed', 'false');
               core.setOutput('error_message', `${kmom} requirements not met:\n${failMessages}`);
+              core.setFailed(`${kmom} requirements not met. See details above.`);
             }
 
   run-tester:
@@ -241,21 +246,20 @@ jobs:
     if: always() && (needs.validate-tag.outputs.workflow_passed != 'true' || needs.run-tester.outputs.tests_passed != 'true')
     runs-on: ubuntu-latest
     steps:
-      - name: Determine error message
-        id: determine-message
-        run: |
-          if [[ "${{ needs.validate-tag.outputs.workflow_passed }}" != "true" ]]; then
-            echo "error_message=${{ needs.validate-tag.outputs.error_message }}" >> $GITHUB_OUTPUT
-          else
-            echo "error_message=Tests failed for the latest tag. Fix the errors and push a new tag with passing tests." >> $GITHUB_OUTPUT
-          fi
-
       - name: Comment on PR with error message
         uses: actions/github-script@v7
+        env:
+          VALIDATE_PASSED: ${{ needs.validate-tag.outputs.workflow_passed }}
+          VALIDATE_ERROR: ${{ needs.validate-tag.outputs.error_message }}
+          KMOM: ${{ needs.validate-tag.outputs.kmom }}
         with:
           github-token: ${{ secrets.READ_ORG_TOKEN }}
           script: |
-            const errorMessage = `${{ steps.determine-message.outputs.error_message }}`;
+            const { owner, repo } = context.repo;
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const errorMessage = process.env.VALIDATE_PASSED === 'true'
+              ? `Tests failed for ${process.env.KMOM}. [View the failed run](${runUrl})\nFix the errors, push a new tag, and open a new PR.`
+              : process.env.VALIDATE_ERROR;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
