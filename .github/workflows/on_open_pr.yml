@@ -211,7 +211,7 @@ jobs:
         with:
           github-token: ${{ secrets.READ_ORG_TOKEN }}
           script: |
-            const commentBody = `✅ Assignment submitted to Canvas for ${latestTag.name}. PR is ready for grading.`;
+            const commentBody = `✅ Assignment submitted to Canvas. PR is ready for grading.`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
