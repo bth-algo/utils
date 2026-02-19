@@ -132,7 +132,7 @@ jobs:
                 console.log(`✅ ${latestTag.name} has a passing workflow: ${successfulRun.html_url}`);
                 prefixResults.push({ prefix, tag: latestTag.name, passed: true });
               } else {
-                console.log(`❌ ${latestTag.name} has no passing workflow (${workflowRuns.data.workflow_runs.length} completed runs).`);
+                console.log(`❌ ${latestTag.name} has no passing workflow (Number of found ${latestTag.name} tags: ${workflowRuns.data.workflow_runs.length}. If it is zero that means you need to create a tag for that kmom. If it is above zero, you need to create a new tag with passing tests for that kmom).`);
                 prefixResults.push({ prefix, tag: latestTag.name, passed: false, message: `Tag ${latestTag.name} has no passing workflow. Fix the errors and push a new ${prefix}.x tag with passing tests.` });
               }
             }
