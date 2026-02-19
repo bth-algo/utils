@@ -103,60 +103,58 @@ jobs:
               return;
             }
             
-            const latestTag = sortedTags[0];
-            console.log(`Latest tag: ${latestTag.name} (SHA: ${latestTag.sha})`);
-            
-            // Dereference the tag to get the commit SHA
-            const tagObject = await github.rest.git.getRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: `tags/${latestTag.name}`
-            });
-            
-            let commitSha = tagObject.data.object.sha;
-            
-            // If it's an annotated tag, we need to get the commit it points to
-            if (tagObject.data.object.type === 'tag') {
-              const annotatedTag = await github.rest.git.getTag({
+            console.log(`Checking ${sortedTags.length} tags for a passing workflow (latest semver first)...`);
+
+            // Helper: resolve a tag ref to its commit SHA (handles annotated tags)
+            async function resolveCommitSha(tagName) {
+              const tagObject = await github.rest.git.getRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                tag_sha: commitSha
+                ref: `tags/${tagName}`
               });
-              commitSha = annotatedTag.data.object.sha;
+              let sha = tagObject.data.object.sha;
+              if (tagObject.data.object.type === 'tag') {
+                const annotatedTag = await github.rest.git.getTag({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag_sha: sha
+                });
+                sha = annotatedTag.data.object.sha;
+              }
+              return sha;
             }
 
-            console.log(`Commit SHA for tag: ${commitSha}`);
-            
-            // Check workflow runs for this commit SHA
-            const workflowRuns = await github.rest.actions.listWorkflowRunsForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              event: 'push',
-              head_sha: commitSha,
-              status: 'completed',
-              per_page: 100
-            });
-            
-            console.log(`Found ${workflowRuns.data.workflow_runs.length} completed workflow runs for tag ${latestTag.name}`);
-            
-            if (workflowRuns.data.workflow_runs.length === 0) {
-              core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `Tag ${latestTag.name} for ${kmom} has no completed workflow runs. Wait for workflows to complete or push a new tag with prefix from [${allowedPrefixes.join(', ')}].`);
-              return;
+            // Check each tag in semver-descending order; use the first with a passing workflow
+            let passingTag = null;
+            for (const tag of sortedTags) {
+              const commitSha = await resolveCommitSha(tag.name);
+              console.log(`Checking tag ${tag.name} (SHA: ${commitSha})...`);
+
+              const workflowRuns = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                event: 'push',
+                head_sha: commitSha,
+                status: 'completed',
+                per_page: 100
+              });
+
+              const successfulRun = workflowRuns.data.workflow_runs.find(run => run.conclusion === 'success');
+              if (successfulRun) {
+                console.log(`✅ Tag ${tag.name} has a passing workflow: ${successfulRun.html_url}`);
+                passingTag = tag;
+                break;
+              } else {
+                console.log(`❌ Tag ${tag.name} has no passing workflow (${workflowRuns.data.workflow_runs.length} completed runs).`);
+              }
             }
-            
-            // Check if at least one workflow succeeded
-            const successfulRun = workflowRuns.data.workflow_runs.find(run => run.conclusion === 'success');
-            
-            if (successfulRun) {
-              console.log(`✅ Tag ${latestTag.name} has successful workflow run: ${successfulRun.html_url}`);
+
+            if (passingTag) {
               core.setOutput('workflow_passed', 'true');
               core.setOutput('error_message', '');
             } else {
-              console.log(`❌ Tag ${latestTag.name} has no successful workflow runs`);
-              const failedRun = workflowRuns.data.workflow_runs[0];
               core.setOutput('workflow_passed', 'false');
-              core.setOutput('error_message', `Tag ${latestTag.name} for ${kmom} has no passing workflow. Fix the errors and push a new tag with prefix from [${allowedPrefixes.join(', ')}].`);
+              core.setOutput('error_message', `No tag for ${kmom} has a passing workflow. Fix the errors and push a new tag with prefix from [${allowedPrefixes.join(', ')}].`);
             }
 
   run-tester:
