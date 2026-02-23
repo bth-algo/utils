@@ -104,6 +104,17 @@ jobs:
               console.log(`Could not remove label "${removeLabel}": ${e.message}`);
             }
 
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: "Run tests"
+              });
+            } catch (e) {
+              console.log(`Could not remove label "Run tests": ${e.message}`);
+            }
+
   submit-grade:
     needs: check-label-and-auth
     if: "contains(needs.check-label-and-auth.outputs.label_name, 'Grade: ') && needs.check-label-and-auth.outputs.is_teacher == 'true'"
