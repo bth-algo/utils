@@ -176,7 +176,14 @@ jobs:
         uses: actions-ecosystem/action-add-labels@v1
         with:
           github_token: ${{ secrets.read_org_token }}
-          labels: "Tests passed"
+          labels: "Tests passed (TP)"
+
+      - name: Remove "Tests passed" label
+        uses: actions-ecosystem/action-remove-labels@v1
+        continue-on-error: true
+        with:
+          github_token: ${{ secrets.read_org_token }}
+          labels: "Tests failed"
 
       - id: created_body
         run: |
