@@ -152,10 +152,8 @@ jobs:
         run: |
           cat << EOF >> $GITHUB_OUTPUT
           myoutput<<EOM
-          <h2>Grade: ${{ steps.find-grade.outputs.grade }}</h2>
-          <br>
-          <h3>${{ steps.get-pr.outputs.pr_title }}</h3>
-          ${{ steps.get-pr.outputs.pr_body }}<br>
+          Grade: ${{ steps.find-grade.outputs.grade }}
+          Set by: ${{ github.event.sender.login }}
           <br>
           PR URL: <a class='inline_disabled' href='${{ steps.get-pr.outputs.pr_url }}' target='_blank' rel='noopener noreferrer'>${{ steps.get-pr.outputs.pr_url }}</a>
           EOM
