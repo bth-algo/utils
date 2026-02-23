@@ -146,7 +146,7 @@ jobs:
               if (r.tag)    return `- ❌ **${r.prefix}**: found \`${r.tag}\` — no passing workflow`;
               return              `- ❌ **${r.prefix}**: no tag found`;
             });
-            const tagSummary = `**Tag check for ${kmom}:**\n${summaryLines.join('\n')}`;
+            const tagSummary = `**Tag check:**\n${summaryLines.join('\n')}`;
             core.setOutput('tag_summary', tagSummary);
 
             if (failed.length === 0) {
