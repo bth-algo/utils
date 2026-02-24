@@ -120,6 +120,18 @@ jobs:
             }
 
 
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print debug info
+        run: |
+          echo "Extracted grade: ${{ needs.check-label-and-auth.outputs.label_name }}"
+          echo "Is allowed label: ${{ needs.check-label-and-auth.outputs.is_teacher }}"
+            echo "Is teacher: ${{ contains(needs.check-label-and-auth.outputs.label_name, 'Grade: U') || contains(needs.check-label-and-auth.outputs.label_name, 'Grade: Ux') || contains(needs.check-label-and-auth.outputs.label_name, 'Grade: F') }}"
+
+
+
+
 
   if-not-passed:
     runs-on: ubuntu-latest
