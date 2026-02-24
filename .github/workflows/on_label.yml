@@ -180,7 +180,7 @@ jobs:
           <br>
           Set by: ${{ github.event.sender.login }}
           <br><br>
-          Read comments on the PR for details and feedback.
+          Read comments on the PR for details.
           <br><br>
           PR URL: <a class='inline_disabled' href='${{ steps.get-pr.outputs.pr_url }}' target='_blank' rel='noopener noreferrer'>${{ steps.get-pr.outputs.pr_url }}</a>
           EOM
