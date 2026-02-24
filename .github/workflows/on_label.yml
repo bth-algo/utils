@@ -122,6 +122,7 @@ jobs:
 
   debug:
     runs-on: ubuntu-latest
+    needs: check-label-and-auth
     steps:
       - name: Print debug info
         run: |
