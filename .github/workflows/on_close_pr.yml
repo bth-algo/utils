@@ -7,9 +7,6 @@ on:
       available_assignments:
         required: true
         type: string
-      student_id:
-        required: true
-        type: string
 
 jobs:
   check-team:
@@ -51,6 +48,15 @@ jobs:
           EOM
           EOF
 
+      - name: Get Student Canvas ID
+        id: get-canvas-id
+        uses: bth-algo/utils/.github/actions/get-student-canvas-id@main
+        with:
+          course_id: ${{ inputs.course_id }}
+          canvas_api_token: ${{ secrets.CANVAS_API_TOKEN }}
+          read_org_token: ${{ secrets.READ_ORG_TOKEN }}
+          github_login: ${{ github.event.pull_request.user.login }}
+
       - uses: bth-python/utils/.github/actions/get-assignment-id@main
         id: resolve
         with:
@@ -65,7 +71,7 @@ jobs:
           canvas_api_token: ${{ secrets.CANVAS_API_TOKEN }}
           course_id: ${{ inputs.course_id }}
           assignment_id: ${{ steps.resolve.outputs.assignment }}
-          student_id: ${{ inputs.student_id }}
+          student_id: ${{ steps.get-canvas-id.outputs.canvas_student_id }}
           read_org_token: "${{ secrets.READ_ORG_TOKEN }}"
 
   student-closed:
@@ -83,6 +89,15 @@ jobs:
           EOM
           EOF
 
+      - name: Get Student Canvas ID
+        id: get-canvas-id
+        uses: bth-algo/utils/.github/actions/get-student-canvas-id@main
+        with:
+          course_id: ${{ inputs.course_id }}
+          canvas_api_token: ${{ secrets.CANVAS_API_TOKEN }}
+          read_org_token: ${{ secrets.READ_ORG_TOKEN }}
+          github_login: ${{ github.event.pull_request.user.login }}
+
       - uses: bth-python/utils/.github/actions/get-assignment-id@main
         id: resolve
         with:
@@ -97,5 +112,5 @@ jobs:
           canvas_api_token: ${{ secrets.CANVAS_API_TOKEN }}
           course_id: ${{ inputs.course_id }}
           assignment_id: ${{ steps.resolve.outputs.assignment }}
-          student_id: ${{ inputs.student_id }}
+          student_id: ${{ steps.get-canvas-id.outputs.canvas_student_id }}
           read_org_token: "${{ secrets.READ_ORG_TOKEN }}"
