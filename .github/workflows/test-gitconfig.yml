@@ -9,12 +9,6 @@ on:
       available_assignments:
         required: true
         type: string
-      kmom_paths:
-        required: true
-        type: string
-      tags:
-        required: true
-        type: string
 
 jobs:
   run-check:
