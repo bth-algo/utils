@@ -72,11 +72,17 @@ jobs:
           assignment_id: ${{ steps.resolve.outputs.assignment }}
           read_org_token: "${{ secrets.READ_ORG_TOKEN }}"
 
-      - name: Add "Tests passed" label
-        uses: actions-ecosystem/action-add-labels@v1
+      - name: Set grade to G in Canvas
+        uses: bth-python/utils/.github/actions/update-canvas@main
         with:
-          github_token: ${{ secrets.read_org_token }}
-          labels: "Grade: G"
+          subcommand: "grade_submission"
+          comment: "Automated grading: All checks passed."
+          canvas_api_token: ${{ secrets.CANVAS_API_TOKEN }}
+          student_id: ${{ steps.get-canvas-id.outputs.canvas_student_id }}
+          grade: "G"
+          course_id: ${{inputs.course_id}}
+          assignment_id: ${{ steps.resolve.outputs.assignment }}
+          read_org_token: "${{ secrets.READ_ORG_TOKEN }}"
 
       - name: Put comment in PR about submission
         uses: actions/github-script@v7
